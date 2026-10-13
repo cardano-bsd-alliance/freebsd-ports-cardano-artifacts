@@ -5,10 +5,6 @@
       "port": 3001
     },
     {
-      "address": "backbone.mainnet.emurgornd.com",
-      "port": 3001
-    },
-    {
       "address": "backbone.mainnet.cardanofoundation.org",
       "port": 3001
     }
@@ -38,11 +34,12 @@
       "warmValency": 6
     }
   ],
+  "peerSnapshotFile": "peer-snapshot.json",
   "publicRoots": [
     {
       "accessPoints": [],
       "advertise": false
     }
   ],
-  "useLedgerAfterSlot": 128908821
+  "useLedgerAfterSlot": 194140785
 }

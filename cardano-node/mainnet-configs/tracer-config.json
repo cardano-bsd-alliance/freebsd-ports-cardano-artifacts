@@ -1,34 +1,29 @@
 {
   "networkMagic": 764824073,
   "network": {
-    "tag": "ConnectTo",
-    "contents": ["/socket/cnode-tracer.sock"]
+    "tag": "AcceptAt",
+    "contents": "/socket/cnode-tracer.sock"
+  },
+  "hasEKG": {
+    "epHost": "127.0.0.1",
+    "epPort": 12788
   },
   "hasPrometheus": {
     "epHost": "0.0.0.0",
-    "epPort": 3000
-  },
-  "hasRTView": {
-    "epHost": "0.0.0.0",
-    "epPort": 3300
+    "epPort": 12808
   },
   "logging": [
     {
-      "logRoot": "/logs/cardano-tracer-h-logs",
-      "logMode": "FileMode",
-      "logFormat": "ForHuman"
-    },
-    { 
-      "logRoot": "/logs/cardano-tracer-m-logs",
+      "logRoot": "/logs/cardano-tracer",
       "logMode": "FileMode",
       "logFormat": "ForMachine"
     }
   ],
   "rotation": {
-    "rpFrequencySecs": 15,
-    "rpKeepFilesNum": 5,
-    "rpLogLimitBytes": 50000,
-    "rpMaxAgeHours": 1
+    "rpFrequencySecs": 60,
+    "rpKeepFilesNum": 10,
+    "rpLogLimitBytes": 50000000,
+    "rpMaxAgeHours": 24
   },
-  "verbosity": "Maximum"
+  "verbosity": "ErrorsOnly"
 }
