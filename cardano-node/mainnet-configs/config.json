@@ -33,7 +33,7 @@
       "backends": [
         "EKGBackend",
         "PrometheusSimple suffix 0.0.0.0 12798",
-        "Stdout MachineFormat"
+        "Stdout HumanFormatUncoloured"
       ],
       "detail": "DNormal",
       "severity": "Notice"

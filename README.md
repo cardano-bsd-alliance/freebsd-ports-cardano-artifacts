@@ -26,12 +26,13 @@ What changed compared with the previous (node 9.1.0) artifacts:
   `Trace*` switches, `minSeverity`, `setupScribes`, `defaultScribes`,
   `setupBackends`, `rotation`, `hasEKG`, `hasPrometheus`, ...). The
   `TraceOptions` based tracing system is the only one left, and a node can no
-  longer write its own log file (see [Logging to a file](#logging-to-a-file)).
+  longer write its own log file (see [Logging (syslog)](#logging-syslog)).
 * `ConsensusMode` is `GenesisMode` (Ouroboros Genesis). It needs the ledger
   peer snapshot `peer-snapshot.json`, referenced from `topology.json`.
-* Lightweight checkpoints (`checkpoints.json`, mainnet and preview only).
-  `CheckpointsFileHash` is the blake2b-256 hash of that file, like the genesis
-  hashes.
+* Lightweight checkpoints (`checkpoints.json`). `CheckpointsFileHash` is the
+  blake2b-256 hash of that file, like the genesis hashes. The official files
+  have checkpoints for mainnet and preview only; preprod gets an empty list so
+  that every network has the same set of files.
 * `LedgerDB` block (UTxO-HD, `V2InMemory` backend and the snapshot policy).
   Ledger state snapshots written by 9.x/10.x are not compatible; the first start
   replays the chain from the local immutable DB.
@@ -43,12 +44,12 @@ What changed compared with the previous (node 9.1.0) artifacts:
 
 | File                     | Purpose |
 | ------------------------ | ------- |
-| `config.json`            | Node configuration. JSON log lines on **stdout**; Prometheus metrics served by the node on `0.0.0.0:12798`. |
-| `config-wtracer.json`    | Same configuration, but the traces are forwarded to `cardano-tracer`, which writes the log files. Prometheus on `0.0.0.0:12798` is kept. |
-| `tracer-config.json`     | `cardano-tracer` configuration matching `config-wtracer.json`. |
+| `config.json`            | Node configuration used by the port. Plain-text log lines on **stdout**, which the rc script sends to **syslog**; Prometheus metrics served by the node on `0.0.0.0:12798`. |
+| `config-wtracer.json`    | Optional, not used by the port: the traces are forwarded to `cardano-tracer`, which writes rotated log files. Prometheus on `0.0.0.0:12798` is kept. |
+| `tracer-config.json`     | Optional, not used by the port: `cardano-tracer` configuration matching `config-wtracer.json`. |
 | `topology.json`          | P2P topology: official bootstrap peers and `useLedgerAfterSlot`, the ledger peer snapshot, local roots with placeholders to replace. |
 | `peer-snapshot.json`     | Ledger peer snapshot (big ledger peers) used while the node bootstraps. |
-| `checkpoints.json`       | Lightweight checkpoints (mainnet and preview). |
+| `checkpoints.json`       | Lightweight checkpoints (empty list on preprod). |
 | `*-genesis.json`         | Byron, Shelley, Alonzo and Conway genesis files. |
 | `submit-api-config.json` | `cardano-submit-api` configuration (new tracing format since submit-api 10.2). |
 
@@ -58,41 +59,75 @@ the official release defaults: root severity `Notice`, with `ChainDB`,
 `Info`, noisy ChainDB events rate limited and `Mempool` silenced on mainnet
 (`Info` on the test networks).
 
-### Logging to a file
+### Logging (syslog)
 
-The node's tracing backends are `Stdout MachineFormat`,
-`Stdout HumanFormatColoured`, `Stdout HumanFormatUncoloured`, `EKGBackend`,
-`PrometheusSimple [suffix|nosuffix] [host] <port>` and `Forwarder`. There is no
-file backend and no rotation inside the node. Two ways to get log files:
+A node can no longer write its own log file. Its tracing backends are
+`Stdout MachineFormat`, `Stdout HumanFormatColoured`,
+`Stdout HumanFormatUncoloured`, `EKGBackend`,
+`PrometheusSimple [suffix|nosuffix] [host] <port>` and `Forwarder`; there is no
+file backend and no rotation inside the node.
 
-1. **cardano-tracer** (`config-wtracer.json` + `tracer-config.json`), the
-   supported replacement for the old `FileSK` scribe. The node is started with
-   `--tracer-socket-path-connect /socket/cnode-tracer.sock`; `cardano-tracer`
-   listens on that socket (`AcceptAt`) and writes rotated JSON logs below
-   `/logs/cardano-tracer/cnode-<network>/` (`node.json` is a symlink to the
-   current file). The rotation keeps the retention of the old `rotation`
-   block: 50 MB per file, 10 files, 24 hours, checked every 60 seconds. Add a
-   second `logging` entry with `"logFormat": "ForHuman"` for plain-text
-   `.log` files as well. The tracer also serves EKG on `127.0.0.1:12788` and
-   Prometheus on `0.0.0.0:12808`.
+`config.json` therefore logs plain text to stdout
+(`Stdout HumanFormatUncoloured`, no ANSI colour codes). The port's rc script
+starts the node with `daemon -S -T cardano-node`, so every line goes to syslog
+as `daemon.notice` with the tag `cardano-node`. With the stock
+`/etc/syslog.conf` it lands in `/var/log/messages`:
 
-   ```sh
-   cardano-tracer --config tracer-config.json
-   cardano-node run --config config-wtracer.json --topology topology.json \
-       --tracer-socket-path-connect /socket/cnode-tracer.sock ...
-   ```
+```sh
+grep cardano-node /var/log/messages
+tail -f /var/log/messages | grep cardano-node
+```
 
-   Start order does not matter: the node reconnects (`maxReconnectDelay` 30 s)
-   and buffers up to `queueSize` (128) messages while the tracer is away, older
-   messages are dropped. `config-wtracer.json` has no stdout backend, so with
-   it the tracer has to run whenever the node runs; add
-   `"Stdout MachineFormat"` to the `backends` list to log to both.
+The node logs far more than the old artifacts sent to syslog (they used the
+`FileSK` scribe), and the stock newsyslog rule rotates `/var/log/messages` at
+1 MB with 5 archives. A dedicated, larger log file is recommended; it needs no
+change to the rc script:
 
-2. **stdout redirection** (`config.json`). The node prints one JSON object per
-   line to stdout and the rc script captures it, for example with
-   `daemon -o /logs/cnode.json` (add `-H` so that newsyslog(8) can rotate the
-   file, or use `-S` to log to syslog instead). Nothing rotates the file
-   otherwise.
+```
+# /usr/local/etc/syslog.d/cardano-node.conf
+!cardano-node
+*.*						/var/log/cardano-node.log
+!*
+```
+
+```
+# /usr/local/etc/newsyslog.conf.d/cardano-node.conf
+# logfilename                 mode count size(KB) when flags
+/var/log/cardano-node.log     640  10    51200    *    JC
+```
+
+```sh
+touch /var/log/cardano-node.log && chmod 640 /var/log/cardano-node.log
+service syslogd reload
+```
+
+This keeps the old retention of 50 MB x 10 files. The lines still reach
+`/var/log/messages` too; to keep them out, add `!-cardano-node` on its own line
+at the top of `/etc/syslog.conf`, before the `/dev/console` and
+`/var/log/messages` rules (the existing `!-devd` line further down resets the
+filter).
+
+Notes:
+
+* daemon(8) logs every line at priority `notice`, so syslog cannot filter by
+  the node's own severity; use `severity` in `TraceOptions` for that.
+* daemon(8) splits lines longer than 4095 bytes.
+* For JSON logs, use `Stdout MachineFormat` instead.
+* Alternative without syslog: `config-wtracer.json` + `tracer-config.json`
+  with `cardano-tracer`, which the port builds but does not start. That needs
+  a second process in the rc script.
+
+### rc script fetch list
+
+`service cardano_node fetch` downloads a fixed list of files. In Genesis mode
+the node refuses to start without `peer-snapshot.json`, and `config.json`
+references `checkpoints.json`, so the port's rc script needs both added:
+
+```sh
+cardano_config_files="config byron-genesis shelley-genesis alonzo-genesis conway-genesis topology submit-api-config peer-snapshot checkpoints"
+```
+
+The rc script fetches from the `master` branch of this repository.
 
 ### Metrics ports
 
