@@ -28,11 +28,12 @@
       "warmValency": 4
     }
   ],
+  "peerSnapshotFile": "peer-snapshot.json",
   "publicRoots": [
     {
       "accessPoints": [],
       "advertise": false
     }
   ],
-  "useLedgerAfterSlot": 64454371
+  "useLedgerAfterSlot": 130118358
 }

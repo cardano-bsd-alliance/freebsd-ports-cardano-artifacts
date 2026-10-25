@@ -1,0 +1,29 @@
+{
+  "networkMagic": 2,
+  "network": {
+    "tag": "AcceptAt",
+    "contents": "/socket/cnode-tracer.sock"
+  },
+  "hasEKG": {
+    "epHost": "127.0.0.1",
+    "epPort": 12788
+  },
+  "hasPrometheus": {
+    "epHost": "0.0.0.0",
+    "epPort": 12808
+  },
+  "logging": [
+    {
+      "logRoot": "/logs/cardano-tracer",
+      "logMode": "FileMode",
+      "logFormat": "ForMachine"
+    }
+  ],
+  "rotation": {
+    "rpFrequencySecs": 60,
+    "rpKeepFilesNum": 10,
+    "rpLogLimitBytes": 50000000,
+    "rpMaxAgeHours": 24
+  },
+  "verbosity": "ErrorsOnly"
+}
